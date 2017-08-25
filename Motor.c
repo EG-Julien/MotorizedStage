@@ -1,90 +1,105 @@
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+/*
+
+    Writed by Julien GENESTE - Under MIT License
+                    08/24/2k17
+
+
+    Documetation Arduino : https://www.arduino.cc/en/Reference/HomePage
+
+ */
+
+
+#include <Wire.h> // Needed to control I2C Lcd
+#include <LiquidCrystal_I2C.h> // Needed to control I2C Lcd
 
 #define DEBUG false
 
-#define en   6
-#define step 5
-#define dir  4
+#define en   6 // Enable pin for A4988
+#define step 5 // Step pin for A4988
+#define dir  4 // Direction pin for A4988
 
-#define bp1 9
-#define bp2 8
-#define bp3 7
-#define bp4 10
+#define bp1 9 // Button Position 1
+#define bp2 8 // Button position 2
+#define bp3 7 // Button position 3
+#define bp4 10 // Setup button
 
-#define pot  0
+#define pot  0 // /!\ ANALOG PIN A0 /!\ - Potentiometer
 
-#define endS1 1
-#define endS2 0
+#define endS1 1 // End swith 1 (closest from the motor)
+#define endS2 0 // End swith 2
 
-#define MAXROT 17300
+#define MAXROT 17300 // Maximal number of steps (Software limit)
 
-int pos1 = 1000;
-int pos2 = 9250;
-int pos3 = 17300;
+int pos1 = 1000; // Preset position 1
+int pos2 = 9250; // Preset position 2
+int pos3 = 17300; // Preset position 3
 
-int currentpos = 0;
-int direction;
+int currentpos = 0; // Current position of the cart
+int direction; // Current set direction for the motor
 
-int mil1 = millis();
+int mil1 = millis(); // Interuption system
 int mil2;
+int mil3 = millis();
+int mil4;
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Initialisation of the lcds
 
-void setup() {
+void setup() { // Runing once
 
     if (DEBUG == true) {
-        Serial.begin(115200);
+        Serial.begin(115200); // If in debugging, start serial communication software
     }
 
-    lcd.begin();
+    lcd.begin(); // Strating of the lcd
 
-    pinMode(step, OUTPUT);
+    pinMode(step, OUTPUT); // These pins are INPUT or OUTPUT ?s
     pinMode(dir, OUTPUT);
     pinMode(endS1, INPUT);
     pinMode(endS2, INPUT);
     pinMode(en, OUTPUT);
 
-    pinMode(bp1, INPUT_PULLUP);
+    pinMode(bp1, INPUT_PULLUP); // INPUT_PULLUP => Input with DEFAULT HIGH logical state (5V)
     pinMode(bp2, INPUT_PULLUP);
     pinMode(bp3, INPUT_PULLUP);
     pinMode(bp4, INPUT_PULLUP);
 
 
-    digitalWrite(dir, LOW);
+    digitalWrite(dir, LOW); // Set the dir pin to 0Vs
 
-    lcd.clear();
+    lcd.clear(); // Erase all content displayed by the LCD
 
-    if (digitalRead(endS1) != LOW) {
-        startCalibration();
+    if (digitalRead(endS1) != LOW) { // If the cart is not at position 0
+        startCalibration(); // We start the calibrations
     } else {
-        lcdState();
+        lcdState(); // Else, we display information about current position of the cart and direction
     }
 
-    lcd.setCursor(0, 1);
-    lcd.print(pos1);
-    lcd.setCursor(6, 1);
-    lcd.print(pos2);
-    lcd.setCursor(11, 1);
-    lcd.print(pos3);
+    presetPos(); // We display preset position
 }
 
-void loop() {
+void loop() { // This code is runing in a loop
 
-    if (digitalRead(bp4) == LOW) {
+    // Follow me ! function
+    // Button 1 and 4 pressed at the same time
 
-        //SET POS 1
+    if ((digitalRead(bp4) == LOW) && (digitalRead(bp3) == LOW)) {
+        followMe();
+    }
+
+    if (digitalRead(bp4) == LOW && digitalRead(bp3) == HIGH) { // If the setup button has been pressed
+
+        //First we change the fisrt preset position
 
         do {
+            lcd.setCursor(0, 1); // We place the cursor at the right position (Row 0, line 1)
+            lcd.print("     "); // Erasing last position
+            pos1 = map(analogRead(pot), 0, 1023, 0, MAXROT); // Getting potentiometer value to set the position, but this value is between 0 and 1023 (10 Bits ADC) and we need a value between 0 and MAXROT, so we're using map function
             lcd.setCursor(0, 1);
-            lcd.print("     ");
-            pos1 = map(analogRead(pot), 0, 1023, 0, MAXROT);
-            lcd.setCursor(0, 1);
-            lcd.print(pos1);
+            lcd.print(pos1); // We print the position on the screen
             delay(100);
-        } while (digitalRead(bp4) != LOW);
+        } while (digitalRead(bp4) != LOW); // And we do this until the setup's button is pressed once again
 
-        delay(500);
+        delay(500); // We wait 500 ms before the next loop
 
         //SET POS 2
 
@@ -114,72 +129,106 @@ void loop() {
 
     }
 
-    getPos(bp1);
-    getPos(bp2);
-    getPos(bp3);
+    getPos(bp1); // Check if the first position's button has been presseds
+    getPos(bp2); // Some for the second potion's button
+    getPos(bp3); // And finaly for the third one
 
-    lcdState();
+    lcdState(); // Display the current information
 
-    digitalWrite(en, HIGH);
+    digitalWrite(en, HIGH); // Put the enable pin to HIGH logical state AKA 5V
 }
 
-void startCalibration() {
+void presetPos() {
+    lcd.setCursor(0, 1); // We display preset position
+    lcd.print(pos1);
+    lcd.setCursor(6, 1);
+    lcd.print(pos2);
+    lcd.setCursor(11, 1);
+    lcd.print(pos3);
+}
+
+void startCalibration() { // Function to calibrate the system
 
     lcd.clear();
     lcd.print("Calibration ...");
 
-    digitalWrite(en, LOW);
-    digitalWrite(dir, LOW);
+    digitalWrite(en, LOW); // Activation of the A4988
+    digitalWrite(dir, LOW); // Set the good direction
     while (digitalRead(endS1) != LOW) {
-        doStep(1);
+        doStep(1); // And we turn on the motor until the end switch which is the near the motor is activated
     }
 
-    currentpos = 0;
+    currentpos = 0; // Now we have set the position 0
 
     lcd.clear();
     lcd.print("Position Homed !");
-    delay(1000);
+    delay(1000); // We wait a second
     lcdState();
 }
 
-void doStep(int dely) {
+void doStep(int dely) { // Function to make the motor run forward / backward (1 step = 1/200 rot)
 
-    digitalWrite(en, LOW);
+    digitalWrite(en, LOW); // Make sure the A4988 is not sleeping
 
-    if ((digitalRead(endS1) == LOW && digitalRead(dir) == LOW) || (digitalRead(endS2) == LOW && digitalRead(dir) == HIGH)) {
+    if ((digitalRead(endS1) == LOW && digitalRead(dir) == LOW) || (digitalRead(endS2) == LOW && digitalRead(dir) == HIGH)) { // Check if the stage can do the step without hurting the end of the cariage
         lcdState();
     } else {
-        if (digitalRead(dir) == HIGH) {
-            currentpos++;
+        if (digitalRead(dir) == HIGH) { // We increse / decrease the current pos in fuction of direction status
+            currentpos++; // Equals to currentpos = currentpos + 1;
         } else {
             currentpos--;
         }
+
+        // Generation of the square wave which controls the A4988
+
         digitalWrite(step, HIGH);
-        delay(dely);
+        delay(dely); // Wait for the delay given in parameter, (Higher delay = slower speed)
         digitalWrite(step, LOW);
-        delay(dely);
+        delay(dely); // Wait for the delay given in parameter, (Higher delay = slower speed)
     }
 
 }
 
-void lcdState() {
+void doStepWL(int dely) { // Function to make the motor run forward / backward (1 step = 1/200 rot)
 
-    mil2 = millis();
+    digitalWrite(en, LOW); // Make sure the A4988 is not sleeping
 
-    if ((mil2 - mil1) > 500) {
-        mil1 = millis();
-        int __pos = currentpos;
-        int __dir = direction;
+    if ((digitalRead(endS1) == LOW && digitalRead(dir) == LOW) || (digitalRead(endS2) == LOW && digitalRead(dir) == HIGH)) { // Check if the stage can do the step without hurting the end of the cariage
+    } else {
+        if (digitalRead(dir) == HIGH) { // We increse / decrease the current pos in fuction of direction status
+            currentpos++; // Equals to currentpos = currentpos + 1;
+        } else {
+            currentpos--;
+        }
+
+        // Generation of the square wave which controls the A4988
+
+        digitalWrite(step, HIGH);
+        delay(dely); // Wait for the delay given in parameter, (Higher delay = slower speed)
+        digitalWrite(step, LOW);
+        delay(dely); // Wait for the delay given in parameter, (Higher delay = slower speed)
+    }
+
+}
+
+void lcdState() { // This function sends informations to the LCD
+
+    mil2 = millis(); // Interuption system
+
+    if ((mil2 - mil1) > 500) { // If the last refresh is older then 500 ms we refresh the LCD's informations else we do noting
+        mil1 = millis(); // Reset he interuption system
+        int __pos = currentpos; // Internal variable
+        int __dir = direction; // Internal variable
 
         lcd.setCursor(0, 0);
 
-        if (__pos == 0 || digitalRead(endS1) == LOW) {
+        if (__pos == 0 || digitalRead(endS1) == LOW) { // If the cart is at the 0 pos or it's touching the switch which is close to the motor we displays these informations on line one of the lcd
             lcd.print("At fwd pos 0 rot");
-        } else if (__pos == MAXROT || digitalRead(endS2) == LOW) {
+        } else if (__pos == MAXROT || digitalRead(endS2) == LOW) { // Same as before but for the second switch AKA the opposit side
             lcd.print("At rev pos ");
             lcd.print(MAXROT);
             lcd.print(" r");
-        } else {
+        } else { // If the cart is able to moove, we send direction and position informations
             lcd.print("Dir:");
             lcd.print(__dir);
             lcd.print(" ");
@@ -198,9 +247,9 @@ void lcdState() {
 
 }
 
-void getPos(int bp) {
+void getPos(int bp) { // This funciton allows us to know which button was pressed :1, 2 or 3
   int nb = 0;
-    if (digitalRead(bp) == LOW) {
+    if (digitalRead(bp) == LOW) { // Calculates positions
         if (bp == bp1) {
             nb = pos1 - currentpos;
         } else if (bp == bp2) {
@@ -209,17 +258,17 @@ void getPos(int bp) {
             nb = pos3 - currentpos;
         }
 
-        if (nb < 0) {
+        if (nb < 0) { // If the position is before the cart we reverse the direction of the motor
             digitalWrite(dir, LOW);
             direction = 0;
             nb = abs(nb);
-        } else {
+        } else { // Otherwise we kept the current direction (We set it again to be sure !)
             digitalWrite(dir, HIGH);
             direction = 1;
         }
 
-        for (int i = 0; i < nb; ++i) {
-            if (digitalRead(bp4) == LOW) {
+        for (int i = 0; i < nb; ++i) { // We run into a loop untill the end of the step's sequence
+            if (digitalRead(bp4) == LOW) { // If the button 4 is pressed we immediately stop the motor and exit the loop
                 delay(500);
                 return;
             }
@@ -228,4 +277,82 @@ void getPos(int bp) {
         }
 
     }
+}
+
+void followMe() {
+    lcd.setCursor(0, 0);
+        lcd.print("  Follow me  !  ");
+        lcd.setCursor(0, 1);
+        lcd.print("                ");
+
+        delay(500);
+
+        int i = 0;
+        do {
+            int rot = map(analogRead(pot), 0, 1023, 0, MAXROT);
+            int nb = rot - currentpos;
+
+            if (nb < 0) {
+                digitalWrite(dir, LOW);
+                direction = 0;
+            } else {
+                digitalWrite(dir, HIGH);
+                direction = 1;
+            }
+
+            mil4 = millis();
+
+            if (mil4 - mil3 > 250) {
+                lcd.setCursor(0, 1);
+                lcd.print("                ");
+                lcd.setCursor(0, 1);
+                lcd.print("CP:");
+                lcd.print(currentpos);
+                lcd.setCursor(9, 1);
+                lcd.print("R:");
+                lcd.print(rot);
+                mil3 = millis();
+            }
+
+
+            if (currentpos != rot) {
+                doStepWL(1);
+            } else {
+                digitalWrite(en, HIGH);
+                if (digitalRead(bp1) == LOW) {
+                    pos1 = currentpos;
+                    lcd.clear();
+                    lcd.print("Pos 1 set:");
+                    lcd.print(pos1);
+                    delay(800);
+                }
+
+                if (digitalRead(bp2) == LOW) {
+                    pos2 = currentpos;
+                    lcd.clear();
+                    lcd.print("Pos 2 set:");
+                    lcd.print(pos2);
+                    delay(800);
+                }
+
+                if (digitalRead(bp3) == LOW) {
+                    pos3 = currentpos;
+                    lcd.clear();
+                    lcd.print("Pos 3 set:");
+                    lcd.print(pos3);
+                    delay(800);
+                }
+            }
+
+        } while (digitalRead(bp4) != LOW);
+
+        lcd.clear();
+        lcd.print("   Normal Mod   ");
+        delay(500);
+        lcd.clear();
+        mil1 = millis() + 1000;
+        lcdState();
+        presetPos();
+
+        digitalWrite(en, HIGH);
 }
