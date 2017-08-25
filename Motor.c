@@ -83,7 +83,7 @@ void loop() { // This code is runing in a loop
     // Button 1 and 4 pressed at the same time
 
     if ((digitalRead(bp4) == LOW) && (digitalRead(bp3) == LOW)) {
-        followMe();
+        followMe(); // Execute Follow me function
     }
 
     if (digitalRead(bp4) == LOW && digitalRead(bp3) == HIGH) { // If the setup button has been pressed
@@ -138,12 +138,12 @@ void loop() { // This code is runing in a loop
     digitalWrite(en, HIGH); // Put the enable pin to HIGH logical state AKA 5V
 }
 
-void presetPos() {
-    lcd.setCursor(0, 1); // We display preset position
+void presetPos() { // Function to display preset position
+    lcd.setCursor(0, 1); // We display preset position 1
     lcd.print(pos1);
-    lcd.setCursor(6, 1);
+    lcd.setCursor(6, 1); // 2
     lcd.print(pos2);
-    lcd.setCursor(11, 1);
+    lcd.setCursor(11, 1); // And 3
     lcd.print(pos3);
 }
 
@@ -280,79 +280,79 @@ void getPos(int bp) { // This funciton allows us to know which button was presse
 }
 
 void followMe() {
-    lcd.setCursor(0, 0);
-        lcd.print("  Follow me  !  ");
-        lcd.setCursor(0, 1);
-        lcd.print("                ");
+    lcd.setCursor(0, 0); // Some text to prevent the user
+    lcd.print("  Follow me  !  ");
+    lcd.setCursor(0, 1);
+    lcd.print("                ");
 
-        delay(500);
+    delay(500);
 
-        int i = 0;
-        do {
-            int rot = map(analogRead(pot), 0, 1023, 0, MAXROT);
-            int nb = rot - currentpos;
+    int i = 0;
+    do {
+        int rot = map(analogRead(pot), 0, 1023, 0, MAXROT); // Getting the position of the potentiometter
+        int nb = rot - currentpos; // Calculating of the number of rotation to do
 
-            if (nb < 0) {
-                digitalWrite(dir, LOW);
-                direction = 0;
-            } else {
-                digitalWrite(dir, HIGH);
-                direction = 1;
+        if (nb < 0) { // Calculating direction to choose
+            digitalWrite(dir, LOW);
+            direction = 0;
+        } else {
+            digitalWrite(dir, HIGH);
+            direction = 1;
+        }
+
+        mil4 = millis();
+
+        if (mil4 - mil3 > 250) { // We refresh the screen every 250 ms
+            lcd.setCursor(0, 1);
+            lcd.print("                ");
+            lcd.setCursor(0, 1);
+            lcd.print("CP:"); // Displaying current position
+            lcd.print(currentpos);
+            lcd.setCursor(9, 1);
+            lcd.print("R:"); // Displaying position to reach
+            lcd.print(rot);
+            mil3 = millis();
+        }
+
+
+        if (currentpos != rot) { // If the current position is different than the position to reach we turn the motor until those position are equals
+            doStepWL(1); // Same function than doStep but without the LCD return
+        } else {
+            digitalWrite(en, HIGH); // Disable A4988
+            if (digitalRead(bp1) == LOW) { // If Bp 1 is pressed
+                pos1 = currentpos; // Setting the current position as position 1
+                lcd.clear();
+                lcd.print("Pos 1 set:"); // Print the new position 1 on the screen
+                lcd.print(pos1);
+                delay(800);
             }
 
-            mil4 = millis();
-
-            if (mil4 - mil3 > 250) {
-                lcd.setCursor(0, 1);
-                lcd.print("                ");
-                lcd.setCursor(0, 1);
-                lcd.print("CP:");
-                lcd.print(currentpos);
-                lcd.setCursor(9, 1);
-                lcd.print("R:");
-                lcd.print(rot);
-                mil3 = millis();
+            if (digitalRead(bp2) == LOW) { // If bp 2 is pressed
+                pos2 = currentpos; // Setting current position as position 2
+                lcd.clear();
+                lcd.print("Pos 2 set:"); // Print the new position 2 on the screen
+                lcd.print(pos2);
+                delay(800);
             }
 
-
-            if (currentpos != rot) {
-                doStepWL(1);
-            } else {
-                digitalWrite(en, HIGH);
-                if (digitalRead(bp1) == LOW) {
-                    pos1 = currentpos;
-                    lcd.clear();
-                    lcd.print("Pos 1 set:");
-                    lcd.print(pos1);
-                    delay(800);
-                }
-
-                if (digitalRead(bp2) == LOW) {
-                    pos2 = currentpos;
-                    lcd.clear();
-                    lcd.print("Pos 2 set:");
-                    lcd.print(pos2);
-                    delay(800);
-                }
-
-                if (digitalRead(bp3) == LOW) {
-                    pos3 = currentpos;
-                    lcd.clear();
-                    lcd.print("Pos 3 set:");
-                    lcd.print(pos3);
-                    delay(800);
-                }
+            if (digitalRead(bp3) == LOW) { // If bp 3 is pressed
+                pos3 = currentpos; // Setting current position as position 3
+                lcd.clear();
+                lcd.print("Pos 3 set:"); // Print the new position 3 on the screen
+                lcd.print(pos3);
+                delay(800);
             }
+        }
 
-        } while (digitalRead(bp4) != LOW);
+    } while (digitalRead(bp4) != LOW); // We repeat this until the button 4 is pressed
 
-        lcd.clear();
-        lcd.print("   Normal Mod   ");
-        delay(500);
-        lcd.clear();
-        mil1 = millis() + 1000;
-        lcdState();
-        presetPos();
+    lcd.clear();
+    lcd.print("   Normal Mod   "); // Then the screen is cleared and tell the user he switchs into the normal mod
+    delay(500);
+    lcd.clear();
+    mil1 = millis() + 1000;
+    lcdState(); // Display the current state of the cart
+    presetPos(); // Print preset position
 
-        digitalWrite(en, HIGH);
+    digitalWrite(en, HIGH); // Disable A4988
 }
